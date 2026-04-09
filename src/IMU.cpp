@@ -51,16 +51,20 @@ void myIMU::zeroGyro(){
 
 }
 
-Madgwick filter;
-float accelScale, gyroScale;
+Madgwick filter; //Specific filter for IMU
 
 void myIMU::IMUfilter() {
+  //all work done here
   filter.updateIMU(data.gx, data.gy, data.gz, data.ax, data.ay, data.az);
 
+  // library uses roll pitch yaw x y z, I use yaw roll pitch x y z
+  // assigns to data and accounts for difference
   data.magYaw = filter.getRoll();
   data.magRoll = filter.getPitch();
   data.magPitch = filter.getYaw();
 
+  // Uses my own get function in library
+  // Normally these are hidden as private
   data.reltoglobeQ0 = filter.getQ0();
   data.reltoglobeQ1 = filter.getQ1();
   data.reltoglobeQ2 = filter.getQ2();
@@ -68,15 +72,16 @@ void myIMU::IMUfilter() {
 }
 
 bool myIMU::convertToGlobal(){
+  // Short hand for readability 
   float qw = data.reltoglobeQ0;
   float qx = data.reltoglobeQ1;
   float qy = data.reltoglobeQ2;
   float qz = data.reltoglobeQ3;
-
   float ax = data.ax;
   float ay = data.ay;
   float az = data.az;
 
+  // Uses the quaternion to rotate the acceleration from the IMU to a global reference frame
   data.worldAx = ax * (1.0f - 2.0f * qy * qy - 2.0f * qz * qz) +
                     ay * (2.0f * qx * qy - 2.0f * qw * qz) +
                     az * (2.0f * qx * qz + 2.0f * qw * qy);

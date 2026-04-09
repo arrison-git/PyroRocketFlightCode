@@ -28,8 +28,6 @@ bool finishedWriting = false;                 // Check if flash has finished wri
 unsigned long prevLoopTime;                   // Resets each next loop, measures loop time
 unsigned long currentLoopTime;                // Resets each loop, measures loop time
 
-//unsigned long launchAbortTime = 0;          // Unused   
-
 bool firstLaunchLoop = true;                  // Is this the first loop in the launch commanded state    
 bool firstAbortLoop = true;                   // Is this the first loop in the aborted state
 //unsigned long abortLoopTime = 0;            // Unused
@@ -49,26 +47,26 @@ myFilter filt;                  // Kalman filter object
 myLoRa lora(radioPin);          // Lora object
 myBuzz buzz(buzzPin);           // Buzz object
 myBat bat(voltPin);             // Battery object
-myFilter kalmanX;
-myFilter kalmanY;
+myFilter kalmanX;               // Kalman divided between axis
+myFilter kalmanY;               // Y-axis is up
 myFilter kalmanZ;
 
 
-Chrono navTimer;   //Find nav timing
+Chrono navTimer;                //Find nav timing
 
 //^ My functions
-void handleNav();                 //runs sensors logging, radio and state switching
-bool isAnglePassedThreshold();    //checks if need to abort
+void handleNav();               //runs sensors logging, radio and state switching
+bool isAnglePassedThreshold();  //checks if need to abort
 
-// Set up sensors, output, Serial. Also inti states then switch
+// Set up sensors, output, Serial. Also inti states then switch to idle
 void setup() {
-  delay(1500);
+  delay(1500);                    // Wait for feather to power on
   goToState(INITIALIZING);
   buzz.buzzStart();
   Serial.println("start init");
 
   //serial setup
-  Serial.begin(115200);  //main serial
+  Serial.begin(115200);           //main serial rate
   while (!Serial);
   Serial.println("Serial on");
   gps.GPSstart();                 //gps setup
@@ -82,12 +80,10 @@ void setup() {
   kalmanY.startKalman();
   kalmanZ.startKalman();
 
-  delay(100);
-
   buzz.buzzComplete(); //finished set up now go to Idle state
   
   // Read loop times
-  prevLoopTime = micros();       
+  prevLoopTime = 0;       
   currentLoopTime = micros();     
 
   // End setup choose state
@@ -106,7 +102,7 @@ void setup() {
 
 void loop() {
   //runs every loop//
-  handleNav();                  // Get all sensor data, Check battery, run loop times
+  handleNav();                  // Get all sensor data, run filters, Check battery, run loop times
   sd.handleWriteFlash();      
   //handleEUI();
   //handleTransmit();
@@ -247,14 +243,10 @@ void loop() {
 }
 
 void handleNav() {
-
-
-  //delay(1000);
-
   //get all data and write to data.h
   if (navTimer.hasPassed(NAV_RATE)) {
-    data.loopTime = micros();
 
+    data.loopTime = micros();
     imu.getIMU();
     gps.GPSaltitude();
     gps.GPSx();
@@ -263,21 +255,26 @@ void handleNav() {
     gps.GPSlon();
     gps.GPSsats();
     barometer.baroAlt();
-    data.ms = millis();  // total millis
+    data.ms = millis();  // total millis since start up
 
     //sd.writeData();
 
     //get loop times + write loop time to data
     bat.handleBatteryCheck();  //bat voltage
   }
-  imu.IMUfilter();
+  imu.IMUfilter();  // Take in raw imu data output the filtered attitude
+
+  // Arrays for the output of kalman filter, blank to start
   float XfilteredDataArray[3];
   float YfilteredDataArray[3];
   float ZfilteredDataArray[3];
+
+  // Kalman filter input is position and acceleration, array is blank to be edited by kalman
   kalmanX.runKalman(data.gpsx, data.ax, XfilteredDataArray);
   kalmanZ.runKalman(data.gpsz, data.az, ZfilteredDataArray);
   kalmanY.runKalman(data.gpsAltitude, data.ay, YfilteredDataArray);
 
+  // Assign the output arrays from kalman to data
   data.kal_X_pos = XfilteredDataArray[0];
   data.kal_X_vel = XfilteredDataArray[1];
   data.kal_X_accel = XfilteredDataArray[2];
@@ -288,7 +285,7 @@ void handleNav() {
   data.kal_Y_vel = YfilteredDataArray[1];
   data.kal_Y_accel = YfilteredDataArray[2];
 
-
+  
   navTimer.restart();
   data.prevLoopTime = data.loopTime;
 }
