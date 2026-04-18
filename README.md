@@ -23,3 +23,5 @@ The Rocket "Pyro"
 The Flight Computer
 <img width="949" height="949" alt="image" src="https://github.com/user-attachments/assets/b76bf399-d4d5-43f4-8a9d-8fc14ca16c92" />
 
+Flight Computer PCB File
+<img width="1115" height="471" alt="image" src="https://github.com/user-attachments/assets/610893ff-a44b-497b-85cc-490c54321527" />
